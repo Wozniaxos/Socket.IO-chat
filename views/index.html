@@ -6,12 +6,14 @@
       * { margin: 0; padding: 0; box-sizing: border-box; }
       body { font: 13px Helvetica, Arial; }
       #messageForm { background: #000; padding: 3px; position: fixed; bottom: 0; width: 100%; }
-      #nicknameForm { background: #000; padding: 3px; position: fixed; top: 0; width: 100%; }
+      #nicknameForm { background: #000; padding: 3px; width: 100%; }
       form input { border: 0; padding: 10px; width: 90%; margin-right: .5%; }
       form button { width: 9%; background: rgb(130, 224, 255); border: none; padding: 10px; }
       #messages { list-style-type: none; margin: 0; padding: 0; }
       #messages li { padding: 5px 10px; }
       #messages li:nth-child(odd) { background: #eee; }
+      #onlineMembers { list-style-type: none; margin: 0; padding: 0; padding-top: 60vh}
+      #onlineMembers li { padding: 5px 10px; }
     </style>
   </head>
   <body>
@@ -19,32 +21,57 @@
       <input id="n" autocomplete="off" placeholder="enter nick to connect chat" /><button>Save</button>
     </form>
     <ul id="messages"></ul>
+    <ul id="onlineMembers"></ul>
     <form id="messageForm" action="">
       <input id="m" autocomplete="off" placeholder="type message" /><button>Send</button>
     </form>
     <script src="/socket.io/socket.io.js"></script>
     <script>
-      var socket = null;
-      var nickname = null;
+      let socket = null;
+      let nickname = null;
+      let onlineMembers = null;
 
-      var saveNickHandler = function(event) {
+      fetch('http://7d057ec9.ngrok.io//online')
+        .then((response) => {
+          let parsed = response.json()
+            .then((parsed) => {
+              onlineMembers = parsed
+              renderOnlines();
+            });
+        });
+
+      const saveNickHandler = (event) => {
         event.preventDefault();
-        var input = document.getElementById('n');
+        const input = document.getElementById('n');
         inputValue = input.value;
         if (inputValue) {
           if (socket !== null) {
             alert(`You are already connected with ${nickname} nickname`);
           } else {
-            nickname = inputValue;
-            socket = io(`http://905466ae.ngrok.io/?nickname=${nickname}`);
-            turnOnSocketListeners(socket);
+            if (nickAvailable(inputValue)) {
+              nickname = inputValue;
+              socket = io(`http://7d057ec9.ngrok.io/?nickname=${nickname}`);
+              turnOnSocketListeners(socket);
+            } else {
+              alert(`Nick ${inputValue} is already taken, please choose different nickname`);
+            }
           }
           input.value = '';
           return false;
         }
       }
 
-      var loadedDomHandler = function () {
+      var nickAvailable = (nickname) => {
+        if (onlineMembers) {
+          return onlineMembers.length > 0
+            ? onlineMembers.indexOf(nickname) === -1
+            : true
+        } else {
+          return true
+        }
+      }
+
+      var loadedDomHandler = () => {
         var messageFormform = document.getElementById('messageForm');
         var nicknameForm = document.getElementById('nicknameForm');
 
@@ -52,40 +79,59 @@
         nicknameForm.addEventListener('submit', saveNickHandler);
       };
 
-      var messageSubmitHandler = function(event) {
+      const messageSubmitHandler = (event) => {
         event.preventDefault();
         if (nickname === null) {
           alert('Please, enter nickname to connect chat');
         } else {
-          var input = document.getElementById('m');
+          const input = document.getElementById('m');
           socket.emit('chat message', input.value);
           input.value = '';
           return false;
         }
       };
 
-      var turnOnSocketListeners = function(socket) {
-        socket.on('chat message', function(msg, user) {
-          var messages = document.getElementById('messages');
-          var newRow = document.createElement('li');
+      const turnOnSocketListeners = (socket) => {
+        socket.on('chat message', (msg, user) => {
+          const messages = document.getElementById('messages');
+          const newRow = document.createElement('li');
           newRow.innerHTML = `${user}: ${msg}`;
           messages.append(newRow);
         });
 
-        socket.on('disconnect info', function(user) {
-          var messages = document.getElementById('messages');
-          var newRow = document.createElement('li');
+        socket.on('disconnect info', (user) => {
+          const messages = document.getElementById('messages');
+          const newRow = document.createElement('li');
           newRow.innerHTML = `${user} just left the channel.`;
           messages.append(newRow);
         });
 
-        socket.on('connected info', function(user) {
-          var messages = document.getElementById('messages');
-          var newRow = document.createElement('li');
+        socket.on('connected info', (user) => {
+          const messages = document.getElementById('messages');
+          const newRow = document.createElement('li');
           newRow.innerHTML = `${user} joined the channel.`;
           messages.append(newRow);
         });
+
+        socket.on('update online', (users) => {
+          onlineMembers = users;
+          renderOnlines();
+        });
       }
+
+      const renderOnlines = () => {
+        const onlines = document.getElementById('onlineMembers');
+        onlines.innerHTML = '';
+        onlines.append(document.createElement('hr'));
+        const titleRow = document.createElement('li');
+        titleRow.innerHTML = 'Online members:'
+        onlines.append(titleRow);
+        onlineMembers.forEach((member) => {
+          const newRow = document.createElement('li');
+          newRow.innerHTML = `🍏 ${member}`;
+          onlines.append(newRow);
+        });
+      };
 
       document.addEventListener('DOMContentLoaded', loadedDomHandler);
     </script>
