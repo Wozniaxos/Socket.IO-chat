@@ -3,16 +3,17 @@ var http = require('http').Server(app);
 var io = require('socket.io')(http);
 
 app.get('/', function(req, res){
-  res.sendFile(__dirname + '/index.html');
+  res.sendFile(__dirname + '/views/index.html');
 });
 
 io.on('connection', function(socket){
-  console.log('a user connected');
+  let connectedClient = socket.handshake.query.nickname
+  io.emit('connected info', connectedClient);
   socket.on('disconnect', function(){
-    console.log('user disconnected');
+    io.emit('disconnect info', connectedClient);
   });
   socket.on('chat message', function(msg){
-    io.emit('chat message', msg);
+    io.emit('chat message', msg, connectedClient);
   });
 });
 
